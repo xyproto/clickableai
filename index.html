@@ -31,6 +31,30 @@
             var rawMarkdown = `{{.MarkdownOutput}}`; // Insert the raw Markdown here
             var result = md.render(rawMarkdown);
             document.getElementById("content").innerHTML = result;
+
+            // Replace selected text with a button
+            document.onmouseup = function() {
+                var selection = window.getSelection();
+                var selectedText = selection.toString().trim();
+
+                if (selectedText) {
+                    var range = selection.getRangeAt(0);
+                    var button = document.createElement("button");
+                    button.innerText = selectedText;
+                    button.style.backgroundColor = "#007bff";
+                    button.style.color = "white";
+                    button.style.border = "none";
+                    button.style.borderRadius = "5px";
+                    button.style.padding = "5px 10px";
+                    button.style.cursor = "pointer";
+                    button.onclick = function() {
+                        window.location.href = "/generate?keyword=" + encodeURIComponent(selectedText);
+                    };
+
+                    range.deleteContents(); // Remove the selected text
+                    range.insertNode(button); // Insert the button in its place
+                }
+            };
         });
     </script>
 </body>
