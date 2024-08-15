@@ -1,0 +1,7 @@
+*.bak
+*.o
+*.swp
+*.tmp
+.DS_Image
+cmd/simple/simple
+include.txt
