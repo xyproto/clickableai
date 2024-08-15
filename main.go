@@ -5,12 +5,18 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
-	"github.com/xyproto/ollamaclient/v2"
+	"github.com/xyproto/env/v2"
+	"github.com/xyproto/simpleflash"
 )
 
-const mainPrompt = "Generate correct, interesting and technical documentation about these keywords, in Markdown: "
+const (
+	textModel       = "gemini-1.5-flash-001"
+	multiModalModel = "gemini-1.0-pro-vision-001"
+	mainPrompt      = "Generate correct, interesting and technical documentation about these keywords, in Markdown: "
+)
 
 type PageData struct {
 	Keywords       []string
@@ -18,11 +24,28 @@ type PageData struct {
 }
 
 var (
+	projectLocation = env.Str("PROJECT_LOCATION", "europe-west4") // europe-west4 is the default
+	projectID       = env.Str("PROJECT_ID")
+	sf              *simpleflash.SimpleFlash
 	currentKeywords = []string{"Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"}
 	keywordTrail    = []string{}
 )
 
 func main() {
+	// Check if PROJECT_ID is set
+	if projectID == "" {
+		fmt.Fprintln(os.Stderr, "Error: PROJECT_ID environment variable is not set.")
+		return
+	}
+
+	// Initialize the SimpleFlash instance
+	var err error
+	sf, err = simpleflash.New(textModel, multiModalModel, projectLocation, projectID, true)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		return
+	}
+
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/generate", generateHandler)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -61,22 +84,16 @@ func generateHandler(w http.ResponseWriter, r *http.Request) {
 func generateMarkdownAndKeywords(trail []string) (string, []string) {
 	prompt := mainPrompt + strings.Join(trail, " -> ")
 
-	oc := ollamaclient.New()
-	oc.Verbose = true
-
-	if err := oc.PullIfNeeded(); err != nil {
-		fmt.Println("Error:", err)
-		return "Error: Could not pull model", nil
-	}
-
-	output, err := oc.GetOutput(prompt)
+	temperature := 0.0
+	output, err := sf.QueryGemini(prompt, &temperature, nil, nil)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return "Error: Could not generate output", nil
 	}
 
 	newKeywords := []string{"Networking", "Databases", "Kubernetes"}
-	followUpKeywordsString, err := oc.GetOutput("Generate 10 interesting follow-up keywords that relates to the following text:\n" + output + "\n\n" + "Only output the slice of strings, as Go code. No commentary!")
+	followUpPrompt := "Generate 10 interesting follow-up keywords that relate to the following text:\n" + output + "\n\nOnly output the slice of strings, as Go code. No commentary!"
+	followUpKeywordsString, err := sf.QueryGemini(followUpPrompt, &temperature, nil, nil)
 	if err == nil {
 		followUpKeywordsString = strings.TrimPrefix(followUpKeywordsString, "```go")
 		followUpKeywordsString = strings.TrimPrefix(followUpKeywordsString, "```")
@@ -86,7 +103,17 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 			fields[i] = betweenQuotes(field)
 		}
 		if len(fields) > 1 {
-			newKeywords = fields
+			newKeywords = make([]string, 0, len(fields))
+			for _, field := range fields {
+				nkw := strings.TrimSpace(field)
+				if len(nkw) > 2 {
+					if strings.Contains(nkw, " ") {
+						newKeywords = append(newKeywords, nkw)
+					} else {
+						newKeywords = append(newKeywords, capitalize(nkw))
+					}
+				}
+			}
 		}
 	}
 
