@@ -5,17 +5,22 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/xyproto/ollamaclient/v2"
 )
+
+const mainPrompt = "Generate a correct, interesting and highly technical Markdown document about these keywords: "
 
 type PageData struct {
 	Keywords       []string
 	MarkdownOutput template.HTML
 }
 
-var currentKeywords = []string{"Assembly", "C", "Go", "Rust"}
-var keywordTrail = []string{}
+var (
+	currentKeywords = []string{"Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"}
+	keywordTrail = []string{}
+)
 
 func main() {
 	http.HandleFunc("/", handler)
@@ -45,7 +50,7 @@ func generateHandler(w http.ResponseWriter, r *http.Request) {
 
 	data := PageData{
 		Keywords:       newKeywords,
-		MarkdownOutput: template.HTML(markdown), // Safely render HTML content
+		MarkdownOutput: template.HTML(markdown),
 	}
 	currentKeywords = newKeywords
 
@@ -54,7 +59,7 @@ func generateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func generateMarkdownAndKeywords(trail []string) (string, []string) {
-	prompt := "Generate a Markdown document about: " + fmt.Sprint(trail)
+	prompt := mainPrompt + strings.Join(trail, " -> ")
 
 	oc := ollamaclient.New()
 	oc.Verbose = true
@@ -70,8 +75,17 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 		return "Error: Could not generate output", nil
 	}
 
-	// Simulate new keyword generation based on output
-	newKeywords := []string{"Python", "Concurrency", "WebAssembly"}
+	newKeywords := []string{"Networking", "Databases", "Kubernetes"}
+	followUpKeywordsString, err := oc.GetOutput("Generate 10 interesting follow-up keywords that relates to the following text:\n" + output + "\n\n" + "Only output the slice of strings, as Go code. No commentary!")
+	if err == nil {
+		fields := strings.Split(followUpKeywordsString, ",")
+		for i, field := range fields {
+			fields[i] = betweenQuotes(field)
+		}
+		if len(fields) > 1 {
+			newKeywords = fields
+		}
+	}
 
 	return output, newKeywords
 }
