@@ -1,7 +1,8 @@
+*.bak
 *.o
 *.swp
 *.tmp
-*.bak
 .DS_Store
-include.txt
 clickableai
+include.txt
+run.sh
