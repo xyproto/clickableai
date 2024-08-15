@@ -10,7 +10,7 @@ import (
 	"github.com/xyproto/ollamaclient/v2"
 )
 
-const mainPrompt = "Generate a correct, interesting and highly technical Markdown document about these keywords: "
+const mainPrompt = "Generate correct, interesting and technical documentation about these keywords, in Markdown: "
 
 type PageData struct {
 	Keywords       []string
@@ -19,7 +19,7 @@ type PageData struct {
 
 var (
 	currentKeywords = []string{"Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"}
-	keywordTrail = []string{}
+	keywordTrail    = []string{}
 )
 
 func main() {
@@ -78,6 +78,9 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 	newKeywords := []string{"Networking", "Databases", "Kubernetes"}
 	followUpKeywordsString, err := oc.GetOutput("Generate 10 interesting follow-up keywords that relates to the following text:\n" + output + "\n\n" + "Only output the slice of strings, as Go code. No commentary!")
 	if err == nil {
+		followUpKeywordsString = strings.TrimPrefix(followUpKeywordsString, "```go")
+		followUpKeywordsString = strings.TrimPrefix(followUpKeywordsString, "```")
+		followUpKeywordsString = strings.TrimSuffix(followUpKeywordsString, "```")
 		fields := strings.Split(followUpKeywordsString, ",")
 		for i, field := range fields {
 			fields[i] = betweenQuotes(field)

@@ -53,6 +53,9 @@
 
                     range.deleteContents(); // Remove the selected text
                     range.insertNode(button); // Insert the button in its place
+
+                    // Deselect the text after replacing it
+                    selection.removeAllRanges();
                 }
             };
         });
