@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -19,16 +21,17 @@ const (
 )
 
 type PageData struct {
-	Keywords       []string
-	MarkdownOutput template.HTML
+	Keywords        []string
+	AvailableTopics []string
+	MarkdownOutput  template.HTML
 }
 
 var (
 	projectLocation = env.Str("PROJECT_LOCATION", "europe-west4") // europe-west4 is the default
 	projectID       = env.Str("PROJECT_ID")
 	sf              *simpleflash.SimpleFlash
-	currentKeywords = []string{"Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"}
-	keywordTrail    = []string{}
+	initialTopics   = []string{"Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"}
+	sessionMap      = make(map[string][]string)
 )
 
 func main() {
@@ -48,37 +51,82 @@ func main() {
 
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/generate", generateHandler)
+	http.HandleFunc("/clear", clearHandler)
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
+// generateFingerprint creates a unique identifier based on the request headers and IP address
+func generateFingerprint(r *http.Request) string {
+	h := md5.New()
+
+	// Concatenate various request headers and the IP address
+	io.WriteString(h, r.RemoteAddr)
+	io.WriteString(h, r.Header.Get("User-Agent"))
+	io.WriteString(h, r.Header.Get("Accept-Language"))
+	io.WriteString(h, r.Header.Get("Accept-Encoding"))
+
+	// You can add more headers if needed to increase uniqueness
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFiles("index.html"))
-	data := PageData{
-		Keywords:       currentKeywords,
-		MarkdownOutput: "",
+	sessionID := generateFingerprint(r)
+
+	keywords, ok := sessionMap[sessionID]
+	if !ok {
+		keywords = []string{} // Start with an empty personal list of keywords
+		sessionMap[sessionID] = keywords
 	}
+
+	// Only generate content if a keyword is selected
+	var markdown string
+	if len(keywords) > 0 {
+		markdown, _ = generateMarkdownAndKeywords(keywords)
+	}
+
+	data := PageData{
+		Keywords:        keywords,
+		AvailableTopics: initialTopics,
+		MarkdownOutput:  template.HTML(markdown),
+	}
+
+	tmpl := template.Must(template.ParseFiles("index.html"))
 	tmpl.Execute(w, data)
 }
 
 func generateHandler(w http.ResponseWriter, r *http.Request) {
+	sessionID := generateFingerprint(r)
+
+	keywords, ok := sessionMap[sessionID]
+	if !ok {
+		keywords = []string{} // Start with an empty personal list of keywords
+	}
+
 	keyword := r.URL.Query().Get("keyword")
 	if keyword != "" {
-		keywordTrail = append(keywordTrail, keyword)
+		keywords = append(keywords, keyword)
+		sessionMap[sessionID] = keywords
 	}
 
-	markdown, newKeywords := generateMarkdownAndKeywords(keywordTrail)
+	markdown, _ := generateMarkdownAndKeywords(keywords)
 
 	data := PageData{
-		Keywords:       newKeywords,
-		MarkdownOutput: template.HTML(markdown),
+		Keywords:        keywords,
+		AvailableTopics: initialTopics,
+		MarkdownOutput:  template.HTML(markdown),
 	}
-	currentKeywords = newKeywords
 
 	tmpl := template.Must(template.ParseFiles("index.html"))
 	tmpl.Execute(w, data)
+}
+
+func clearHandler(w http.ResponseWriter, r *http.Request) {
+	sessionID := generateFingerprint(r)
+	sessionMap[sessionID] = []string{} // Clear the personal list of keywords
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func generateMarkdownAndKeywords(trail []string) (string, []string) {
@@ -91,54 +139,7 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 		return "Error: Could not generate output", nil
 	}
 
-	newKeywords := []string{"Networking", "Databases", "Kubernetes"}
-	followUpPrompt := "Generate 10 interesting follow-up keywords that relate to the following text:\n" + output + "\n\nOnly output the slice of strings, as Go code. No commentary!"
-	followUpKeywordsString, err := sf.QueryGemini(followUpPrompt, &temperature, nil, nil)
-	if err == nil {
-		followUpKeywordsString = strings.TrimPrefix(followUpKeywordsString, "```go")
-		followUpKeywordsString = strings.TrimPrefix(followUpKeywordsString, "```")
-		followUpKeywordsString = strings.TrimSuffix(followUpKeywordsString, "```")
-		fields := strings.Split(followUpKeywordsString, ",")
-		for i, field := range fields {
-			fields[i] = betweenQuotes(field)
-		}
-		if len(fields) > 1 {
-			newKeywords = make([]string, 0, len(fields))
-			for _, field := range fields {
-				nkw := strings.TrimSpace(field)
-				if len(nkw) > 2 {
-					if strings.Contains(nkw, " ") {
-						newKeywords = append(newKeywords, nkw)
-					} else {
-						newKeywords = append(newKeywords, capitalize(nkw))
-					}
-				}
-			}
-		}
-	}
+	// The generation of new keywords is omitted since it's based on the trail the user builds up
 
-	return output, newKeywords
-}
-
-// capitalize the first character of the string and make all other characters lowercase
-func capitalize(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-	return strings.ToUpper(s[:1]) + strings.ToLower(s[1:])
-}
-
-// betweenQuotes can return what's between the double quotes in the given string.
-// If fewer than two double quotes are found, return the original string.
-func betweenQuotes(orig string) string {
-	const q = `"`
-	if strings.Count(orig, q) >= 2 {
-		posa := strings.Index(orig, q) + 1
-		posb := strings.LastIndex(orig, q)
-		if posa >= posb {
-			return orig
-		}
-		return orig[posa:posb]
-	}
-	return orig
+	return output, nil
 }

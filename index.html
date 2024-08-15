@@ -8,17 +8,25 @@
         body { display: flex; font-family: Arial, sans-serif; }
         .keywords { width: 20%; padding: 20px; background-color: #f4f4f4; }
         .markdown { width: 80%; padding: 20px; }
-        .keyword { display: block; margin: 5px 0; padding: 10px; border-radius: 5px; background-color: #007bff; color: white; text-decoration: none; text-align: center; }
-        .keyword:hover { background-color: #0056b3; }
+        .keyword, .topic { display: block; margin: 5px 0; padding: 10px; border-radius: 5px; background-color: #007bff; color: white; text-decoration: none; text-align: center; }
+        .keyword:hover, .topic:hover { background-color: #0056b3; }
+        #clear-all { display: block; margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #dc3545; color: white; text-align: center; cursor: pointer; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.2/markdown-it.min.js"></script>
 </head>
 <body>
     <div class="keywords">
-        <h3>Keywords</h3>
-        {{ range .Keywords }}
-        <a href="/generate?keyword={{ . }}" class="keyword">{{ . }}</a>
+        <h3>Available Topics</h3>
+        {{ range .AvailableTopics }}
+        <a href="/generate?keyword={{ . }}" class="topic">{{ . }}</a>
         {{ end }}
+
+        <h3>Your Keywords</h3>
+        {{ range .Keywords }}
+        <a href="#" class="keyword">{{ . }}</a>
+        {{ end }}
+
+        <button id="clear-all">Clear All</button>
     </div>
     <div class="markdown" id="markdown-content">
         <h3>Generated Content</h3>
@@ -32,32 +40,17 @@
             var result = md.render(rawMarkdown);
             document.getElementById("content").innerHTML = result;
 
-            // Replace selected text with a button
-            document.onmouseup = function() {
-                var selection = window.getSelection();
-                var selectedText = selection.toString().trim();
-
-                if (selectedText) {
-                    var range = selection.getRangeAt(0);
-                    var button = document.createElement("button");
-                    button.innerText = selectedText;
-                    button.style.backgroundColor = "#007bff";
-                    button.style.color = "white";
-                    button.style.border = "none";
-                    button.style.borderRadius = "5px";
-                    button.style.padding = "5px 10px";
-                    button.style.cursor = "pointer";
-                    button.onclick = function() {
-                        window.location.href = "/generate?keyword=" + encodeURIComponent(selectedText);
-                    };
-
-                    range.deleteContents(); // Remove the selected text
-                    range.insertNode(button); // Insert the button in its place
-
-                    // Deselect the text after replacing it
-                    selection.removeAllRanges();
-                }
-            };
+            // Handle Clear All button click
+            document.getElementById("clear-all").addEventListener("click", function() {
+                fetch("/clear", { method: "POST" })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert("Failed to clear the session.");
+                        }
+                    });
+            });
         });
     </script>
 </body>
