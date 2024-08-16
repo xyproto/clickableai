@@ -164,7 +164,12 @@ func (mm *MultiModal) AddText(prompt string) {
 
 // SubmitToClient sends all added parts to the specified Vertex AI model for processing,
 // returning the model's response. It supports temperature configuration and response trimming.
-func (mm *MultiModal) SubmitToClient(ctx context.Context, client *genai.Client) (string, error) {
+func (mm *MultiModal) SubmitToClient(ctx context.Context, client *genai.Client) (result string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic occurred: %v", r)
+		}
+	}()
 	// Configure the model
 	model := client.GenerativeModel(mm.modelName)
 	model.SetTemperature(mm.temperature)
@@ -173,12 +178,14 @@ func (mm *MultiModal) SubmitToClient(ctx context.Context, client *genai.Client) 
 	if err != nil {
 		return "", fmt.Errorf("unable to generate contents: %v", err)
 	}
-	// Then examine the reponse
-	if len(res.Candidates) == 0 || (len(res.Candidates) > 0 && len(res.Candidates[0].Content.Parts) == 0) {
+	// Then examine the response, defensively
+	if res == nil || len(res.Candidates) == 0 || res.Candidates[0] == nil ||
+		res.Candidates[0].Content == nil || res.Candidates[0].Content.Parts == nil ||
+		len(res.Candidates[0].Content.Parts) == 0 {
 		return "", errors.New("empty response from model")
 	}
 	// And return the result as a string
-	result := fmt.Sprintf("%s\n", res.Candidates[0].Content.Parts[0])
+	result = fmt.Sprintf("%s\n", res.Candidates[0].Content.Parts[0])
 	if mm.trim {
 		return strings.TrimSpace(result), nil
 	}

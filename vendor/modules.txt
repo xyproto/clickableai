@@ -99,10 +99,10 @@ github.com/xyproto/env
 # github.com/xyproto/env/v2 v2.3.0
 ## explicit; go 1.19
 github.com/xyproto/env/v2
-# github.com/xyproto/multimodal v1.3.1
+# github.com/xyproto/multimodal v1.3.3
 ## explicit; go 1.22.3
 github.com/xyproto/multimodal
-# github.com/xyproto/simpleflash v1.0.0
+# github.com/xyproto/simpleflash v1.0.1
 ## explicit; go 1.22.6
 github.com/xyproto/simpleflash
 # go.opencensus.io v0.24.0

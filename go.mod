@@ -4,7 +4,7 @@ go 1.22.6
 
 require (
 	github.com/xyproto/env/v2 v2.3.0
-	github.com/xyproto/simpleflash v1.0.0
+	github.com/xyproto/simpleflash v1.0.1
 )
 
 require (
@@ -25,7 +25,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
 	github.com/xyproto/env v1.9.1 // indirect
-	github.com/xyproto/multimodal v1.3.1 // indirect
+	github.com/xyproto/multimodal v1.3.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect

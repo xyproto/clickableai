@@ -53,8 +53,25 @@ func main() {
 }
 ```
 
+Building and running the example (in `cmd/simple`):
+
+```sh
+cd cmd/simple
+
+# Use your own Google Cloud Project ID here, and also log in with `gcloud auth application-default login` **or** deploy and run it within Google Cloud:
+export PROJECT_ID=44444444444
+
+# Build the executable
+go build
+
+# Run the program and observe the output
+./simple
+Black and white patches,
+Sun-kissed brown, a gentle breeze,
+Grazing in the field.
+```
+
 ### General info
 
-* Version: 1.0.0
+* Version: 1.0.1
 * License: Apache 2
-* Author: Alexander F. Rødseth
