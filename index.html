@@ -15,13 +15,14 @@
         #add-keyword:hover { background-color: #218838; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.2/markdown-it.min.js"></script>
+    {{.ExtraInHead}}
 </head>
 <body>
     <div class="keywords">
         <h3>Available keywords</h3>
         <div id="available-topics">
             <script>
-                const initialTopics = ["Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"];
+                const initialTopics = [{{.InitialTopics}}];
                 const availableTopicsContainer = document.getElementById("available-topics");
                 initialTopics.forEach(topic => {
                     const topicElement = document.createElement('a');

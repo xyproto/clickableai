@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"html/template"
 	"log"
@@ -13,6 +14,12 @@ import (
 	"github.com/xyproto/simpleflash"
 )
 
+//go:embed extra.conf
+var extraInHead string // extra code that goes into <head>
+
+//go:embed topics.conf
+var initialTopics string // double quoted comma separated list of initial topics
+
 const (
 	textModel          = "gemini-1.5-flash-001"
 	multiModalModel    = "gemini-1.0-pro-vision-001"
@@ -22,9 +29,8 @@ const (
 )
 
 type PageData struct {
-	Keywords        []string
-	MarkdownOutput  string
-	AvailableTopics []string
+	InitialTopics template.HTML
+	ExtraInHead template.HTML
 }
 
 var (
@@ -57,9 +63,7 @@ func main() {
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	data := PageData{
-		Keywords:        []string{},
-		MarkdownOutput:  "",
-		AvailableTopics: initialTopics,
+		ExtraInHead: template.HTML(extraInHead),
 	}
 
 	tmpl := template.Must(template.ParseFiles("index.html"))
