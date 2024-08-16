@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	textModel           = "gemini-1.5-flash-001"
-	multiModalModel     = "gemini-1.0-pro-vision-001"
-	mainPrompt          = "Generate a concise, technical Markdown document based on these keywords. Avoid commentary: "
-	topicPrompt         = "Generate exactly 10 concise topics based on these keywords and the following content. Each topic should be 1-2 words max. Avoid redundancy: "
-	generalTopicPrompt  = "Generate 10 general keywords based on the following Markdown content. Each keyword should be 1-2 words max. Avoid redundancy: "
+	textModel          = "gemini-1.5-flash-001"
+	multiModalModel    = "gemini-1.0-pro-vision-001"
+	mainPrompt         = "Generate a correct, concise, and technical Markdown document based on these keywords. No commentary: "
+	topicPrompt        = "Generate exactly 10 suitable topics based on these keywords and the following content. Output as a strict comma-separated list with no commentary: "
+	generalTopicPrompt = "Generate 10 general keywords based on the following Markdown content. Output as a strict comma-separated list with no commentary: "
 )
 
 type PageData struct {
@@ -99,8 +99,6 @@ func generateTopicsHandler(w http.ResponseWriter, r *http.Request) {
 func generateMarkdownAndKeywords(trail []string) (string, []string) {
 	prompt := mainPrompt + strings.Join(trail, " -> ")
 
-	//log.Printf("Sending prompt to Gemini for Markdown generation: %s\n", prompt)
-
 	temperature := 0.0
 	output, err := sf.QueryGemini(prompt, &temperature, nil, nil)
 	if err != nil {
@@ -115,8 +113,6 @@ func generateNewTopics(keywords []string, markdown string) []string {
 	fmt.Printf("Generating new topics for %v\n", keywords)
 
 	prompt := topicPrompt + strings.Join(keywords, ", ") + " | Content: " + markdown
-
-	//log.Printf("Sending prompt to Gemini for topic generation: %s\n", prompt)
 
 	temperature := 0.5
 	topicsOutput, err := sf.QueryGemini(prompt, &temperature, nil, nil)
@@ -135,8 +131,6 @@ func generateGeneralTopics(markdown string) []string {
 
 	fmt.Printf("Generating general new topics for %d bytes of Markdown.\n", len(markdown))
 
-	//log.Printf("Sending general prompt to Gemini for topic generation: %s\n", prompt)
-
 	temperature := 0.5
 	topicsOutput, err := sf.QueryGemini(prompt, &temperature, nil, nil)
 	if err != nil {
@@ -151,26 +145,29 @@ func generateGeneralTopics(markdown string) []string {
 
 // extractAndShortenTopics processes the output to remove redundant phrases and shorten topics to 1-2 words.
 func extractAndShortenTopics(output string, keywords []string) []string {
-	re := regexp.MustCompile(`([a-zA-Z0-9\-\_ ]+,)+[a-zA-Z0-9\-\_ ]+`)
-	match := re.FindString(output)
+	// Enhanced regular expression to match more flexible formats
+	re := regexp.MustCompile(`(?:^|\s|,)([a-zA-Z0-9\-\_ ]{1,20})(?:,|\s|$)`)
+	matches := re.FindAllString(output, -1)
 
-	if match == "" {
-		log.Println("No valid comma-separated list found in the output")
+	if len(matches) == 0 {
+		log.Println("No valid topics found in the output")
 		return []string{"Error: No valid topics found"}
 	}
 
-	topics := strings.Split(match, ",")
-
-	// Shorten each topic, especially if it's redundant with existing keywords
-	for i, topic := range topics {
-		topic = strings.TrimSpace(topic)
+	topics := []string{}
+	for _, match := range matches {
+		topic := strings.TrimSpace(match)
 		for _, keyword := range keywords {
 			if strings.Contains(strings.ToLower(topic), strings.ToLower(keyword)) {
 				topic = strings.Replace(topic, keyword, "", -1)
 				topic = strings.TrimSpace(topic)
 			}
 		}
-		topics[i] = shortenToTwoWords(topic)
+		topic = shortenToTwoWords(topic)
+		topic = removeStrayCommas(topic) // Remove any stray commas
+		if isValidTopic(topic) && !contains(topics, topic) {
+			topics = append(topics, topic)
+		}
 	}
 
 	if len(topics) > 10 {
@@ -187,4 +184,31 @@ func shortenToTwoWords(topic string) string {
 		return strings.Join(words[:2], " ")
 	}
 	return topic
+}
+
+// removeStrayCommas removes stray commas from a topic.
+func removeStrayCommas(topic string) string {
+	return strings.TrimSpace(strings.TrimLeft(strings.TrimRight(topic, ","), ","))
+}
+
+// isValidTopic filters out generic or commentary-like phrases that should not be treated as topics.
+func isValidTopic(topic string) bool {
+	genericPhrases := []string{"here", "based on", "content", "and", "keeping", "avoiding"}
+	topicLower := strings.ToLower(topic)
+	for _, phrase := range genericPhrases {
+		if strings.Contains(topicLower, phrase) {
+			return false
+		}
+	}
+	return len(topic) > 1
+}
+
+// contains checks if a slice contains a specific string.
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
