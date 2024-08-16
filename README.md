@@ -8,6 +8,8 @@ This is an experiment in making LLMs browsable and clickable instead of promptab
 
 Uses Gemini 1.5 Flash.
 
+**NOTE** that the quota limit may easily be reached!
+
 Set the `PROJECT_ID` environment variable to your Google Cloud Project and also remember to log in with `gcloud auth application-default login` if you want to test this locally.
 
 ### General info
