@@ -7,26 +7,42 @@
     <style>
         body { display: flex; font-family: Arial, sans-serif; }
         .keywords { width: 20%; padding: 20px; background-color: #f4f4f4; }
-        .markdown { width: 80%; padding: 20px; }
-        .keyword, .topic { display: block; margin: 5px 0; padding: 10px; border-radius: 5px; background-color: #007bff; color: white; text-decoration: none; text-align: center; }
+        .markdown { width: 80%; padding: 20px; position: relative; }
+        .keyword, .topic { display: block; margin: 5px 0; padding: 10px; border-radius: 5px; background-color: #007bff; color: white; text-decoration: none; text-align: center; position: relative; }
         .keyword:hover, .topic:hover { background-color: #0056b3; }
-        #clear-all { display: block; margin: 10px 0; padding: 10px; border-radius: 5px; background-color: #dc3545; color: white; text-align: center; cursor: pointer; }
+        .remove-keyword { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background-color: #dc3545; border: none; border-radius: 50%; color: white; cursor: pointer; padding: 2px 6px; font-size: 12px; }
+        #add-keyword { display: none; margin-top: 10px; padding: 10px; border-radius: 5px; background-color: #28a745; color: white; cursor: pointer; width: 100%; text-align: center; }
+        #add-keyword:hover { background-color: #218838; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.2/markdown-it.min.js"></script>
 </head>
 <body>
     <div class="keywords">
         <h3>Available Topics</h3>
-        {{ range .AvailableTopics }}
-        <a href="/generate?keyword={{ . }}" class="topic">{{ . }}</a>
-        {{ end }}
+        <div id="available-topics">
+            <script>
+                const initialTopics = ["Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"];
+                const availableTopicsContainer = document.getElementById("available-topics");
+                initialTopics.forEach(topic => {
+                    const topicElement = document.createElement('a');
+                    topicElement.className = 'topic';
+                    topicElement.textContent = topic;
+                    topicElement.href = '#';
+                    topicElement.onclick = (event) => {
+                        event.preventDefault();
+                        addTopic(topic);
+                    };
+                    availableTopicsContainer.appendChild(topicElement);
+                });
+            </script>
+        </div>
 
         <h3>Your Keywords</h3>
-        {{ range .Keywords }}
-        <a href="#" class="keyword">{{ . }}</a>
-        {{ end }}
+        <div id="user-keywords">
+            <!-- User keywords will be dynamically added here -->
+        </div>
 
-        <button id="clear-all">Clear All</button>
+        <button id="add-keyword">Add Selected Text as Keyword</button>
     </div>
     <div class="markdown" id="markdown-content">
         <h3>Generated Content</h3>
@@ -34,24 +50,121 @@
     </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            var md = window.markdownit();
-            var rawMarkdown = `{{.MarkdownOutput}}`; // Insert the raw Markdown here
-            var result = md.render(rawMarkdown);
-            document.getElementById("content").innerHTML = result;
+        let userKeywords = [];
+        let userInteracted = false;
 
-            // Handle Clear All button click
-            document.getElementById("clear-all").addEventListener("click", function() {
-                fetch("/clear", { method: "POST" })
-                    .then(response => {
-                        if (response.ok) {
-                            window.location.reload();
-                        } else {
-                            alert("Failed to clear the session.");
-                        }
-                    });
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById("content").addEventListener("mouseup", function() {
+                const selectedText = window.getSelection().toString().trim();
+                const addKeywordButton = document.getElementById("add-keyword");
+
+                if (selectedText) {
+                    addKeywordButton.style.display = "block";
+                    addKeywordButton.onclick = function() {
+                        addKeyword(selectedText);
+                    };
+                } else {
+                    addKeywordButton.style.display = "none";
+                }
             });
         });
+
+        function updateUserKeywords() {
+            const userKeywordsContainer = document.getElementById("user-keywords");
+            userKeywordsContainer.innerHTML = '';
+            userKeywords.forEach(keyword => {
+                const keywordElement = document.createElement('div');
+                keywordElement.style.position = 'relative';
+
+                const keywordLink = document.createElement('a');
+                keywordLink.className = 'keyword';
+                keywordLink.textContent = keyword;
+                keywordLink.href = '#';
+
+                const removeButton = document.createElement('button');
+                removeButton.className = 'remove-keyword';
+                removeButton.textContent = 'X';
+                removeButton.onclick = () => removeKeyword(keyword);
+
+                keywordElement.appendChild(keywordLink);
+                keywordElement.appendChild(removeButton);
+                userKeywordsContainer.appendChild(keywordElement);
+            });
+
+            if (userKeywords.length > 0 && !userInteracted) {
+                userInteracted = true;
+                generateNewTopics();
+            }
+
+            sendKeywordsToServer();
+        }
+
+        function addTopic(topic) {
+            if (!userKeywords.includes(topic)) {
+                userKeywords.push(topic);
+                updateUserKeywords();
+            }
+        }
+
+        function addKeyword(keyword) {
+            if (!userKeywords.includes(keyword)) {
+                userKeywords.push(keyword);
+                updateUserKeywords();
+            }
+        }
+
+        function removeKeyword(keyword) {
+            userKeywords = userKeywords.filter(kw => kw !== keyword);
+            updateUserKeywords();
+        }
+
+        function sendKeywordsToServer() {
+            fetch('/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'keywords=' + encodeURIComponent(userKeywords.join(','))
+            })
+            .then(response => response.json())
+            .then(data => {
+                const md = window.markdownit();
+                const renderedMarkdown = md.render(data.markdown);
+                document.getElementById("content").innerHTML = renderedMarkdown;
+            })
+            .catch(error => console.error('Error updating keywords:', error));
+        }
+
+        function generateNewTopics() {
+            fetch('/generate_topics', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'keywords=' + encodeURIComponent(userKeywords.join(',')) + '&markdown=' + encodeURIComponent(document.getElementById("content").innerText)
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateAvailableTopics(data.topics);
+            })
+            .catch(error => console.error('Error generating new topics:', error));
+        }
+
+        function updateAvailableTopics(topics) {
+            const availableTopicsContainer = document.getElementById("available-topics");
+            availableTopicsContainer.innerHTML = '';
+            topics.forEach(topic => {
+                const topicElement = document.createElement('a');
+                topicElement.className = 'topic';
+                topicElement.textContent = topic;
+                topicElement.href = '#';
+                topicElement.onclick = (event) => {
+                    event.preventDefault();
+                    addTopic(topic);
+                };
+                availableTopicsContainer.appendChild(topicElement);
+            });
+        }
     </script>
 </body>
 </html>
