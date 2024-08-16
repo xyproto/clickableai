@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"fmt"
 	"html/template"
@@ -105,10 +106,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute the template and handle errors carefully
-	if err := tmpl.Execute(w, data); err != nil {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
 		log.Printf("Error executing template: %s\n", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
+	w.Write(buf.Bytes())
 }
 
 func generateHandler(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +206,7 @@ func extractAndShortenTopics(output string, keywords []string) []string {
 		topic = shortenToTwoWords(topic)
 		topic = removeStrayCommas(topic)
 		if isValidTopic(topic) && !contains(topics, topic) {
-			topics = append(topics, topic)
+			topics = append(topics, strings.Trim(topic, "\""))
 		}
 	}
 
