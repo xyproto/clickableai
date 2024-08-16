@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Programming Learning Explorer</title>
+    <title>Plink Scrunk</title>
     <style>
         body {
             display: flex;
@@ -63,37 +63,56 @@
             background-color: #218838;
         }
 
-.markdown {
-    width: 80%;
-    padding: 20px;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    min-height: 100%;
-    box-sizing: border-box;
-}
+        .markdown {
+            width: 80%;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            min-height: 100%;
+            box-sizing: border-box;
+        }
 
-.footer {
-    padding: 10px;
-    background-color: #00000000;
-    text-align: right;
-    margin-top: auto;
-    width: 100%;
-    box-sizing: border-box;
-}
+        .footer {
+            padding: 10px;
+            background-color: #00000000;
+            text-align: right;
+            margin-top: auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
 
-.footer img {
-    width: 32px;
-    height: 32px;
-}
+        .footer img {
+            width: 32px;
+            height: 32px;
+        }
 
+        .spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 500px;
+            height: 500px;
+            margin-top: -250px; /* Half of the spinner's height */
+            margin-left: -250px; /* Half of the spinner's width */
+            border: 60px solid #f3f3f3; /* Light grey */
+            border-top: 60px solid #007bff; /* Blue */
+            border-radius: 50%;
+            animation: spin 0.2s linear infinite;
+            z-index: 1000;
+        }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <script src="/markdown-it.min.js"></script>
     {{.ExtraInHead}}
 </head>
 <body>
+    <div id="spinner" class="spinner" style="display: none;"></div>
     <div class="content">
         <div class="keywords">
             <h3>Available keywords</h3>
@@ -200,6 +219,13 @@
         }
 
         function sendKeywordsToServer() {
+            if (!navigator.onLine) {
+                alert("You are offline. Please check your internet connection.");
+                return;
+            }
+
+            document.getElementById("spinner").style.display = "block"; // Show spinner
+
             fetch('/generate', {
                 method: 'POST',
                 headers: {
@@ -209,14 +235,24 @@
             })
             .then(response => response.json())
             .then(data => {
-                const md = window.markdownit();
-                const renderedMarkdown = md.render(data.markdown);
-                document.getElementById("content").innerHTML = renderedMarkdown;
+                if (document.getElementById("content")) {
+                    const md = window.markdownit();
+                    const renderedMarkdown = md.render(data.markdown);
+                    document.getElementById("content").innerHTML = renderedMarkdown;
+                }
             })
-            .catch(error => console.error('Error updating keywords:', error));
+            .catch(error => {
+                console.error('Error updating keywords:', error);
+                alert("An error occurred while updating the content. Please try again later.");
+            })
+            .finally(() => {
+                document.getElementById("spinner").style.display = "none"; // Hide spinner
+            });
         }
 
         function generateNewTopics() {
+            document.getElementById("spinner").style.display = "block"; // Show spinner
+
             fetch('/generate_topics', {
                 method: 'POST',
                 headers: {
@@ -228,12 +264,17 @@
             .then(data => {
                 updateAvailableTopics(data.topics);
             })
-            .catch(error => console.error('Error generating new topics:', error));
+            .catch(error => {
+                console.error('Error generating new topics:', error);
+                alert("An error occurred while generating new topics. Please try again later.");
+            })
+            .finally(() => {
+                document.getElementById("spinner").style.display = "none"; // Hide spinner
+            });
         }
 
         function updateAvailableTopics(topics) {
-            const availableTopicsContainer = document.getElementById("available-topics");
-            availableTopicsContainer.innerHTML = '';
+            const availableTopicsContainer = document.createDocumentFragment(); // Use a document fragment for batch updates
             topics.forEach(topic => {
                 const topicElement = document.createElement('a');
                 topicElement.className = 'topic';
@@ -245,6 +286,9 @@
                 };
                 availableTopicsContainer.appendChild(topicElement);
             });
+            const container = document.getElementById("available-topics");
+            container.innerHTML = ''; // Clear the container once
+            container.appendChild(availableTopicsContainer); // Append the new content in one go
         }
     </script>
 </body>
