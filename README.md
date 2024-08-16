@@ -1,4 +1,4 @@
-# clickableai
+# Clickable AI
 
 This is an experiment in making LLMs browsable and clickable instead of promptable and searchable.
 
