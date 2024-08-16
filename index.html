@@ -5,51 +5,131 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Programming Learning Explorer</title>
     <style>
-        body { display: flex; font-family: Arial, sans-serif; }
-        .keywords { width: 20%; padding: 20px; background-color: #f4f4f4; }
-        .markdown { width: 80%; padding: 20px; position: relative; }
-        .keyword, .topic { display: block; margin: 5px 0; padding: 10px; border-radius: 5px; background-color: #007bff; color: white; text-decoration: none; text-align: center; position: relative; }
-        .keyword:hover, .topic:hover { background-color: #0056b3; }
-        .remove-keyword { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background-color: #dc3545; border: none; border-radius: 50%; color: white; cursor: pointer; padding: 2px 6px; font-size: 12px; }
-        #add-keyword { display: none; margin-top: 10px; padding: 10px; border-radius: 5px; background-color: #28a745; color: white; cursor: pointer; width: 100%; text-align: center; }
-        #add-keyword:hover { background-color: #218838; }
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .content {
+            display: flex;
+            flex: 1;
+        }
+        .keywords {
+            width: 20%;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .keyword, .topic {
+            display: block;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            position: relative;
+        }
+        .keyword:hover, .topic:hover {
+            background-color: #0056b3;
+        }
+        .remove-keyword {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #dc3545;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+        #add-keyword {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+        }
+        #add-keyword:hover {
+            background-color: #218838;
+        }
+
+.markdown {
+    width: 80%;
+    padding: 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+.footer {
+    padding: 10px;
+    background-color: #00000000;
+    text-align: right;
+    margin-top: auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.footer img {
+    width: 32px;
+    height: 32px;
+}
+
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.2/markdown-it.min.js"></script>
     {{.ExtraInHead}}
 </head>
 <body>
-    <div class="keywords">
-        <h3>Available keywords</h3>
-        <div id="available-topics">
-            <script>
-                const initialTopics = [{{.InitialTopics}}];
-                const availableTopicsContainer = document.getElementById("available-topics");
-                initialTopics.forEach(topic => {
-                    const topicElement = document.createElement('a');
-                    topicElement.className = 'topic';
-                    topicElement.textContent = topic;
-                    topicElement.href = '#';
-                    topicElement.onclick = (event) => {
-                        event.preventDefault();
-                        addTopic(topic);
-                    };
-                    availableTopicsContainer.appendChild(topicElement);
-                });
-            </script>
+    <div class="content">
+        <div class="keywords">
+            <h3>Available keywords</h3>
+            <div id="available-topics">
+                <script>
+                    const initialTopics = [{{range .InitialTopics}}{{.}},{{end}}];
+                    const availableTopicsContainer = document.getElementById("available-topics");
+                    initialTopics.forEach(topic => {
+                        const topicElement = document.createElement('a');
+                        topicElement.className = 'topic';
+                        topicElement.textContent = topic;
+                        topicElement.href = '#';
+                        topicElement.onclick = (event) => {
+                            event.preventDefault();
+                            addTopic(topic);
+                        };
+                        availableTopicsContainer.appendChild(topicElement);
+                    });
+                </script>
+            </div>
+
+            <h3>Current keywords</h3>
+            <div id="user-keywords">
+                <!-- User keywords will be dynamically added here -->
+            </div>
+
+            <button id="add-keyword">Add selected text</button>
         </div>
-
-        <h3>Current keywords</h3>
-        <div id="user-keywords">
-            <!-- User keywords will be dynamically added here -->
+        <div class="markdown" id="markdown-content">
+            <h3>Generated Content</h3>
+            <div id="content"></div>
+            <div class="footer">
+                <a href="https://github.com/xyproto/clickableai"><img alt="GitHub Logo" src="/githublogo.png"></a>
+            </div>
         </div>
-
-        <button id="add-keyword">Add selected text</button>
     </div>
-    <div class="markdown" id="markdown-content">
-        <h3>Generated Content</h3>
-        <div id="content"></div>
-    </div>
-
     <script>
         let userKeywords = [];
         let userInteracted = false;

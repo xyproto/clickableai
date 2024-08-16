@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
@@ -18,7 +17,21 @@ import (
 var extraInHead string // extra code that goes into <head>
 
 //go:embed topics.conf
-var initialTopics string // double quoted comma separated list of initial topics
+var initialTopics string // comma separated list of initial topics
+
+//go:embed githublogo.png
+var githublogo []byte
+
+//go:embed index.html
+var indexHTML string
+
+//go:embed robots.txt
+var robots string
+
+type PageData struct {
+	InitialTopics []string
+	ExtraInHead   template.HTML
+}
 
 const (
 	textModel          = "gemini-1.5-flash-001"
@@ -28,46 +41,72 @@ const (
 	generalTopicPrompt = "Generate 10 general keywords based on the following Markdown content. Output as a strict comma-separated list with no commentary: "
 )
 
-type PageData struct {
-	InitialTopics template.HTML
-	ExtraInHead   template.HTML
-}
-
 var (
-	projectLocation = env.Str("PROJECT_LOCATION", "europe-west4")
+	projectLocation = env.Str("PROJECT_LOCATION", "europe-north1")
 	projectID       = env.Str("PROJECT_ID")
 	sf              *simpleflash.SimpleFlash
 )
 
 func main() {
 	if projectID == "" {
-		fmt.Fprintln(os.Stderr, "Error: PROJECT_ID environment variable is not set.")
+		log.Fatalln("Error: PROJECT_ID environment variable is not set.")
 		return
 	}
 
 	var err error
 	sf, err = simpleflash.New(textModel, multiModalModel, projectLocation, projectID, true)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
+		log.Fatalln("Error:", err)
 		return
 	}
 
-	http.HandleFunc("/", handler)
+	// Serve the embedded resources
 	http.HandleFunc("/generate", generateHandler)
 	http.HandleFunc("/generate_topics", generateTopicsHandler)
+	http.HandleFunc("/githublogo.png", githubLogoHandler)
+	http.HandleFunc("/robots.txt", robotsHandler)
+
+	http.HandleFunc("/", handler)
 
 	port := env.Str("PORT", "8080")
 	log.Println("Starting server on :" + port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
+// robotsHandler serves the embedded robots.txt file
+func robotsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(robots))
+}
+
+// githubLogoHandler serves the embedded githublogo.png file
+func githubLogoHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(githublogo)
+}
+
+func foreachS(xs []string, f func(string) string) []string {
+	newxs := make([]string, len(xs))
+	for i, x := range xs {
+		newxs[i] = f(x)
+	}
+	return newxs
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	data := PageData{
-		InitialTopics: template.HTML(initialTopics),
-		ExtraInHead:   template.HTML(extraInHead),
+		InitialTopics: foreachS(strings.Split(initialTopics, ","), func(s string) string {
+			return strings.Trim(strings.TrimSpace(s), "\"")
+		}),
+		ExtraInHead: template.HTML(extraInHead),
 	}
 
-	tmpl := template.Must(template.ParseFiles("index.html"))
+	tmpl1 := template.New("index")
+	tmpl, err := tmpl1.Parse(indexHTML)
+	if err != nil {
+		log.Printf("Error parsing template: %s\n", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %s\n", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -88,7 +127,7 @@ func generateTopicsHandler(w http.ResponseWriter, r *http.Request) {
 	keywords := r.Form["keywords"]
 	markdown := r.FormValue("markdown")
 
-	fmt.Printf("Generating new topics for %v\n", keywords)
+	//fmt.Printf("Generating new topics for %v\n", keywords)
 
 	newTopics := generateNewTopics(keywords, markdown)
 
@@ -107,7 +146,7 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 	temperature := 0.0
 	output, err := sf.QueryGemini(prompt, &temperature, nil, nil)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Println("Error:", err)
 		return "Error: Could not generate output", nil
 	}
 
@@ -115,14 +154,14 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 }
 
 func generateNewTopics(keywords []string, markdown string) []string {
-	fmt.Printf("Generating new topics for %v\n", keywords)
+	//fmt.Printf("Generating new topics for %v\n", keywords)
 
 	prompt := topicPrompt + strings.Join(keywords, ", ") + " | Content: " + markdown
 
 	temperature := 0.5
 	topicsOutput, err := sf.QueryGemini(prompt, &temperature, nil, nil)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Println("Error:", err)
 		return []string{"Error: Could not generate topics"}
 	}
 
@@ -169,7 +208,7 @@ func extractAndShortenTopics(output string, keywords []string) []string {
 			}
 		}
 		topic = shortenToTwoWords(topic)
-		topic = removeStrayCommas(topic) // Remove any stray commas
+		topic = removeStrayCommas(topic)
 		if isValidTopic(topic) && !contains(topics, topic) {
 			topics = append(topics, topic)
 		}
