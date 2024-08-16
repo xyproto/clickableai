@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	textModel          = "gemini-1.5-flash-001"
-	multiModalModel    = "gemini-1.0-pro-vision-001"
-	mainPrompt         = "Generate a correct, concise, and technical Markdown document based on these keywords. No commentary: "
-	topicPrompt        = "Generate exactly 10 suitable topics based on these keywords and the following content. Output as a strict comma-separated list with no commentary: "
-	generalTopicPrompt = "Generate 10 general keywords based on the following Markdown content. Output as a strict comma-separated list with no commentary: "
+	textModel           = "gemini-1.5-flash-001"
+	multiModalModel     = "gemini-1.0-pro-vision-001"
+	mainPrompt          = "Generate a concise, technical Markdown document based on these keywords. Avoid commentary: "
+	topicPrompt         = "Generate exactly 10 concise topics based on these keywords and the following content. Each topic should be 1-2 words max. Avoid redundancy: "
+	generalTopicPrompt  = "Generate 10 general keywords based on the following Markdown content. Each keyword should be 1-2 words max. Avoid redundancy: "
 )
 
 type PageData struct {
@@ -125,18 +125,7 @@ func generateNewTopics(keywords []string, markdown string) []string {
 		return []string{"Error: Could not generate topics"}
 	}
 
-	re := regexp.MustCompile(`([a-zA-Z0-9\-\_ ]+,)+[a-zA-Z0-9\-\_ ]+`)
-	match := re.FindString(topicsOutput)
-
-	if match == "" {
-		log.Println("No valid comma-separated list found in the output")
-		return []string{"Error: No valid topics found"}
-	}
-
-	topics := strings.Split(match, ",")
-	if len(topics) > 10 {
-		topics = topics[:10]
-	}
+	topics := extractAndShortenTopics(topicsOutput, keywords)
 
 	return topics
 }
@@ -155,8 +144,15 @@ func generateGeneralTopics(markdown string) []string {
 		return []string{"Error: Could not generate topics"}
 	}
 
+	topics := extractAndShortenTopics(topicsOutput, []string{})
+
+	return topics
+}
+
+// extractAndShortenTopics processes the output to remove redundant phrases and shorten topics to 1-2 words.
+func extractAndShortenTopics(output string, keywords []string) []string {
 	re := regexp.MustCompile(`([a-zA-Z0-9\-\_ ]+,)+[a-zA-Z0-9\-\_ ]+`)
-	match := re.FindString(topicsOutput)
+	match := re.FindString(output)
 
 	if match == "" {
 		log.Println("No valid comma-separated list found in the output")
@@ -164,9 +160,31 @@ func generateGeneralTopics(markdown string) []string {
 	}
 
 	topics := strings.Split(match, ",")
+
+	// Shorten each topic, especially if it's redundant with existing keywords
+	for i, topic := range topics {
+		topic = strings.TrimSpace(topic)
+		for _, keyword := range keywords {
+			if strings.Contains(strings.ToLower(topic), strings.ToLower(keyword)) {
+				topic = strings.Replace(topic, keyword, "", -1)
+				topic = strings.TrimSpace(topic)
+			}
+		}
+		topics[i] = shortenToTwoWords(topic)
+	}
+
 	if len(topics) > 10 {
 		topics = topics[:10]
 	}
 
 	return topics
+}
+
+// shortenToTwoWords shortens a string to a maximum of two words.
+func shortenToTwoWords(topic string) string {
+	words := strings.Fields(topic)
+	if len(words) > 2 {
+		return strings.Join(words[:2], " ")
+	}
+	return topic
 }
