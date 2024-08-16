@@ -14,5 +14,5 @@ Set the `PROJECT_ID` environment variable to your Google Cloud Project and also 
 
 ### General info
 
+* Version: 0.2.3
 * License: Apache 2
-* Version: 0.2.2
