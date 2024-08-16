@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	_ "embed"
 	"fmt"
 	"html/template"
@@ -33,13 +32,7 @@ var robots string
 var markdownJS []byte
 
 // Parse the indexHTML template and store it in "tmpl", or panic
-var tmpl *template.Template = func() *template.Template {
-	tmpl, err := template.New("index").Parse(indexHTML)
-	if err != nil {
-		panic("Error parsing template: " + err.Error())
-	}
-	return tmpl
-}()
+var tmpl = template.Must(template.New("index").Parse(indexHTML))
 
 type PageData struct {
 	InitialTopics []string
@@ -105,43 +98,16 @@ func markdownJSHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(markdownJS)
 }
 
-func foreachS(xs []string, f func(string) string) []string {
-	newxs := make([]string, len(xs))
-	for i, x := range xs {
-		newxs[i] = f(x)
-	}
-	return newxs
-}
-
 func handler(w http.ResponseWriter, r *http.Request) {
 	data := PageData{
-		InitialTopics: foreachS(strings.Split(initialTopics, ","), func(s string) string {
-			return strings.Trim(strings.TrimSpace(s), "\"")
-		}),
-		ExtraInHead: template.HTML(extraInHead),
-	}
-
-	// Create a buffered writer to handle the response writing
-	bw := bufio.NewWriter(w)
-	defer func() {
-		// Always flush the buffer at the end
-		if err := bw.Flush(); err != nil {
-			log.Printf("Error flushing buffer: %v", err)
-		}
-	}()
-
-	// Check if the client has disconnected before executing the template
-	if r.Context().Err() != nil {
-		log.Println("Client disconnected")
-		return
+		InitialTopics: strings.Split(initialTopics, ","),
+		ExtraInHead:   template.HTML(extraInHead),
 	}
 
 	// Execute the template and handle errors carefully
-	if err := tmpl.Execute(bw, data); err != nil {
+	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %s\n", err)
-		if r.Context().Err() == nil { // Only send the error response if the client is still connected
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
 
@@ -158,8 +124,6 @@ func generateTopicsHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	keywords := r.Form["keywords"]
 	markdown := r.FormValue("markdown")
-
-	//fmt.Printf("Generating new topics for %v\n", keywords)
 
 	newTopics := generateNewTopics(keywords, markdown)
 
@@ -186,8 +150,6 @@ func generateMarkdownAndKeywords(trail []string) (string, []string) {
 }
 
 func generateNewTopics(keywords []string, markdown string) []string {
-	//fmt.Printf("Generating new topics for %v\n", keywords)
-
 	prompt := topicPrompt + strings.Join(keywords, ", ") + " | Content: " + markdown
 
 	temperature := 0.5
@@ -221,7 +183,6 @@ func generateGeneralTopics(markdown string) []string {
 
 // extractAndShortenTopics processes the output to remove redundant phrases and shorten topics to 1-2 words.
 func extractAndShortenTopics(output string, keywords []string) []string {
-	// Enhanced regular expression to match more flexible formats
 	re := regexp.MustCompile(`(?:^|\s|,)([a-zA-Z0-9\-\_ ]{1,20})(?:,|\s|$)`)
 	matches := re.FindAllString(output, -1)
 
@@ -253,7 +214,6 @@ func extractAndShortenTopics(output string, keywords []string) []string {
 	return topics
 }
 
-// shortenToTwoWords shortens a string to a maximum of two words.
 func shortenToTwoWords(topic string) string {
 	words := strings.Fields(topic)
 	if len(words) > 2 {
@@ -262,14 +222,12 @@ func shortenToTwoWords(topic string) string {
 	return topic
 }
 
-// removeStrayCommas removes stray commas from a topic.
 func removeStrayCommas(topic string) string {
 	return strings.TrimSpace(strings.TrimLeft(strings.TrimRight(topic, ","), ","))
 }
 
-// isValidTopic filters out generic or commentary-like phrases that should not be treated as topics.
 func isValidTopic(topic string) bool {
-	genericPhrases := []string{"here", "based on", "content", "and", "keeping", "avoiding"}
+	genericPhrases := []string{"and", "avoiding", "based on", "content", "for", "here", "keeping", "with"}
 	topicLower := strings.ToLower(topic)
 	for _, phrase := range genericPhrases {
 		if strings.Contains(topicLower, phrase) {
@@ -279,7 +237,6 @@ func isValidTopic(topic string) bool {
 	return len(topic) > 1
 }
 
-// contains checks if a slice contains a specific string.
 func contains(slice []string, item string) bool {
 	for _, v := range slice {
 		if v == item {

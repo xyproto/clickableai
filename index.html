@@ -99,7 +99,7 @@
             border: 60px solid #f3f3f3; /* Light grey */
             border-top: 60px solid #007bff; /* Blue */
             border-radius: 50%;
-            animation: spin 0.2s linear infinite;
+            animation: spin 0.3s linear infinite;
             z-index: 1000;
         }
 
@@ -167,6 +167,13 @@
                     addKeywordButton.style.display = "none";
                 }
             });
+
+            document.getElementById("content").addEventListener("click", function(event) {
+                if (event.target && event.target.nodeName === "SPAN") {
+                    const tappedWord = event.target.textContent.trim();
+                    addKeyword(tappedWord);
+                }
+            });
         });
 
         function updateUserKeywords() {
@@ -184,19 +191,16 @@
                 const removeButton = document.createElement('button');
                 removeButton.className = 'remove-keyword';
                 removeButton.textContent = 'X';
-                removeButton.onclick = () => removeKeyword(keyword);
+                removeButton.onclick = () => {
+                    removeKeyword(keyword);
+                };
 
                 keywordElement.appendChild(keywordLink);
                 keywordElement.appendChild(removeButton);
                 userKeywordsContainer.appendChild(keywordElement);
             });
 
-            if (userKeywords.length > 0 && !userInteracted) {
-                userInteracted = true;
-                generateNewTopics();
-            }
-
-            sendKeywordsToServer();
+            generateMarkdown();
         }
 
         function addTopic(topic) {
@@ -218,7 +222,24 @@
             updateUserKeywords();
         }
 
-        function sendKeywordsToServer() {
+        function sendRequestWithRetry(url, options, retryCount = 1) {
+            return fetch(url, options)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .catch(error => {
+                    if (retryCount > 0) {
+                        console.warn('Retrying request...');
+                        return sendRequestWithRetry(url, options, retryCount - 1);
+                    }
+                    throw error;
+                });
+        }
+
+        function generateMarkdown() {
             if (!navigator.onLine) {
                 alert("You are offline. Please check your internet connection.");
                 return;
@@ -226,47 +247,34 @@
 
             document.getElementById("spinner").style.display = "block"; // Show spinner
 
-            fetch('/generate', {
+            const keywordsQuery = encodeURIComponent(userKeywords.join(','));
+
+            sendRequestWithRetry('/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: 'keywords=' + encodeURIComponent(userKeywords.join(','))
+                body: 'keywords=' + keywordsQuery
             })
-            .then(response => response.json())
             .then(data => {
-                if (document.getElementById("content")) {
-                    const md = window.markdownit();
-                    const renderedMarkdown = md.render(data.markdown);
-                    document.getElementById("content").innerHTML = renderedMarkdown;
-                }
-            })
-            .catch(error => {
-                console.error('Error updating keywords:', error);
-                alert("An error occurred while updating the content. Please try again later.");
-            })
-            .finally(() => {
-                document.getElementById("spinner").style.display = "none"; // Hide spinner
-            });
-        }
+                const md = window.markdownit();
+                const renderedMarkdown = md.render(data.markdown);
+                document.getElementById("content").innerHTML = renderedMarkdown;
 
-        function generateNewTopics() {
-            document.getElementById("spinner").style.display = "block"; // Show spinner
-
-            fetch('/generate_topics', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: 'keywords=' + encodeURIComponent(userKeywords.join(',')) + '&markdown=' + encodeURIComponent(document.getElementById("content").innerText)
+                return sendRequestWithRetry('/generate_topics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'keywords=' + keywordsQuery + '&markdown=' + encodeURIComponent(document.getElementById("content").innerText)
+                });
             })
-            .then(response => response.json())
             .then(data => {
                 updateAvailableTopics(data.topics);
             })
             .catch(error => {
-                console.error('Error generating new topics:', error);
-                alert("An error occurred while generating new topics. Please try again later.");
+                console.error('Error generating content:', error);
+                alert("An error occurred while generating content. Please try again later.");
             })
             .finally(() => {
                 document.getElementById("spinner").style.display = "none"; // Hide spinner
