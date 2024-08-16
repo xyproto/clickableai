@@ -28,6 +28,18 @@ var indexHTML string
 //go:embed robots.txt
 var robots string
 
+//go:embed markdown-it.min.js
+var markdownJS []byte
+
+// Parse the indexHTML template and store it in "tmpl", or panic
+var tmpl *template.Template = func() *template.Template {
+	tmpl, err := template.New("index").Parse(indexHTML)
+	if err != nil {
+		panic("Error parsing template: " + err.Error())
+	}
+	return tmpl
+}()
+
 type PageData struct {
 	InitialTopics []string
 	ExtraInHead   template.HTML
@@ -65,6 +77,7 @@ func main() {
 	http.HandleFunc("/generate_topics", generateTopicsHandler)
 	http.HandleFunc("/githublogo.png", githubLogoHandler)
 	http.HandleFunc("/robots.txt", robotsHandler)
+	http.HandleFunc("/markdown-it.min.js", markdownJSHandler)
 
 	http.HandleFunc("/", handler)
 
@@ -85,6 +98,12 @@ func githubLogoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(githublogo)
 }
 
+// markdownJSHandler serves the embedded markdown-it.min.js file
+func markdownJSHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Write(markdownJS)
+}
+
 func foreachS(xs []string, f func(string) string) []string {
 	newxs := make([]string, len(xs))
 	for i, x := range xs {
@@ -101,12 +120,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		ExtraInHead: template.HTML(extraInHead),
 	}
 
-	tmpl1 := template.New("index")
-	tmpl, err := tmpl1.Parse(indexHTML)
-	if err != nil {
-		log.Printf("Error parsing template: %s\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %s\n", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
