@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	_ "embed"
 	"fmt"
 	"html/template"
@@ -46,8 +47,8 @@ type PageData struct {
 }
 
 const (
-	textModel          = "gemini-1.5-flash-001"
-	multiModalModel    = "gemini-1.0-pro-vision-001"
+	textModel          = "gemini-1.5-flash"
+	multiModalModel    = "gemini-1.0-pro-vision"
 	mainPrompt         = "Generate a correct, concise, and technical Markdown document based on these keywords. No commentary: "
 	topicPrompt        = "Generate exactly 10 suitable topics based on these keywords and the following content. Output as a strict comma-separated list with no commentary: "
 	generalTopicPrompt = "Generate 10 general keywords based on the following Markdown content. Output as a strict comma-separated list with no commentary: "
@@ -120,9 +121,27 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		ExtraInHead: template.HTML(extraInHead),
 	}
 
-	if err := tmpl.Execute(w, data); err != nil {
+	// Create a buffered writer to handle the response writing
+	bw := bufio.NewWriter(w)
+	defer func() {
+		// Always flush the buffer at the end
+		if err := bw.Flush(); err != nil {
+			log.Printf("Error flushing buffer: %v", err)
+		}
+	}()
+
+	// Check if the client has disconnected before executing the template
+	if r.Context().Err() != nil {
+		log.Println("Client disconnected")
+		return
+	}
+
+	// Execute the template and handle errors carefully
+	if err := tmpl.Execute(bw, data); err != nil {
 		log.Printf("Error executing template: %s\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if r.Context().Err() == nil { // Only send the error response if the client is still connected
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
