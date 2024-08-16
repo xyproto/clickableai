@@ -30,14 +30,13 @@ const (
 
 type PageData struct {
 	InitialTopics template.HTML
-	ExtraInHead template.HTML
+	ExtraInHead   template.HTML
 }
 
 var (
 	projectLocation = env.Str("PROJECT_LOCATION", "europe-west4")
 	projectID       = env.Str("PROJECT_ID")
 	sf              *simpleflash.SimpleFlash
-	initialTopics   = []string{"Assembly", "C", "Go", "Rust", "Python", "Concurrency", "WebAssembly", "JavaScript", "AI", "Machine Learning"}
 )
 
 func main() {
@@ -63,7 +62,8 @@ func main() {
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	data := PageData{
-		ExtraInHead: template.HTML(extraInHead),
+		InitialTopics: template.HTML(initialTopics),
+		ExtraInHead:   template.HTML(extraInHead),
 	}
 
 	tmpl := template.Must(template.ParseFiles("index.html"))
