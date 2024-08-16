@@ -56,8 +56,9 @@ func main() {
 	http.HandleFunc("/generate", generateHandler)
 	http.HandleFunc("/generate_topics", generateTopicsHandler)
 
-	log.Println("Starting server on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	port := env.Str("PORT", "8080")
+	log.Println("Starting server on :" + port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
