@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plink Scrunk</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .content {
+            display: flex;
+            flex: 1;
+        }
+        .keywords {
+            width: 20%;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .keyword, .topic {
+            display: block;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            position: relative;
+        }
+        .keyword:hover, .topic:hover {
+            background-color: #0056b3;
+        }
+        .remove-keyword {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #dc3545;
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+        #add-keyword {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+        }
+        #add-keyword:hover {
+            background-color: #218838;
+        }
+
+        .markdown {
+            width: 80%;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            min-height: 100%;
+            box-sizing: border-box;
+        }
+
+        .footer {
+            padding: 10px;
+            background-color: #00000000;
+            text-align: right;
+            margin-top: auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .footer img {
+            width: 32px;
+            height: 32px;
+        }
+
+        .spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 500px;
+            height: 500px;
+            margin-top: -250px; /* Half of the spinner's height */
+            margin-left: -250px; /* Half of the spinner's width */
+            border: 60px solid #f3f3f3; /* Light grey */
+            border-top: 60px solid #007bff; /* Blue */
+            border-radius: 50%;
+            animation: spin 0.3s linear infinite;
+            z-index: 1000;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script src="/markdown-it.min.js"></script>
+    {{.ExtraInHead}}
+</head>
+<body>
+    <div id="spinner" class="spinner" style="display: none;"></div>
+    <div class="content">
+        <div class="keywords">
+            <h3>Available keywords</h3>
+            <div id="available-topics">
+                <script>
+                    const initialTopics = [{{range .InitialTopics}}{{.}},{{end}}];
+                    const availableTopicsContainer = document.getElementById("available-topics");
+                    initialTopics.forEach(topic => {
+                        const topicElement = document.createElement('a');
+                        topicElement.className = 'topic';
+                        topicElement.textContent = topic;
+                        topicElement.href = '#';
+                        topicElement.onclick = (event) => {
+                            event.preventDefault();
+                            addTopic(topic);
+                        };
+                        availableTopicsContainer.appendChild(topicElement);
+                    });
+                </script>
+            </div>
+
+            <h3>Current keywords</h3>
+            <div id="user-keywords">
+                <!-- User keywords will be dynamically added here -->
+            </div>
+
+            <button id="add-keyword">Add selected text</button>
+        </div>
+        <div class="markdown" id="markdown-content">
+            <h3>Generated Content</h3>
+            <div id="content"></div>
+            <div class="footer">
+                <a href="https://github.com/xyproto/clickableai"><img alt="GitHub Logo" src="/githublogo.png"></a>
+            </div>
+        </div>
+    </div>
+    <script>
+        let userKeywords = [];
+        let userInteracted = false;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById("content").addEventListener("mouseup", function() {
+                const selectedText = window.getSelection().toString().trim();
+                const addKeywordButton = document.getElementById("add-keyword");
+
+                if (selectedText) {
+                    addKeywordButton.style.display = "block";
+                    addKeywordButton.onclick = function() {
+                        addKeyword(selectedText);
+                    };
+                } else {
+                    addKeywordButton.style.display = "none";
+                }
+            });
+
+            document.getElementById("content").addEventListener("click", function(event) {
+                if (event.target && event.target.nodeName === "SPAN") {
+                    const tappedWord = event.target.textContent.trim();
+                    addKeyword(tappedWord);
+                }
+            });
+        });
+
+        function updateUserKeywords() {
+            const userKeywordsContainer = document.getElementById("user-keywords");
+            userKeywordsContainer.innerHTML = '';
+            userKeywords.forEach(keyword => {
+                const keywordElement = document.createElement('div');
+                keywordElement.style.position = 'relative';
+
+                const keywordLink = document.createElement('a');
+                keywordLink.className = 'keyword';
+                keywordLink.textContent = keyword;
+                keywordLink.href = '#';
+
+                const removeButton = document.createElement('button');
+                removeButton.className = 'remove-keyword';
+                removeButton.textContent = 'X';
+                removeButton.onclick = () => {
+                    removeKeyword(keyword);
+                };
+
+                keywordElement.appendChild(keywordLink);
+                keywordElement.appendChild(removeButton);
+                userKeywordsContainer.appendChild(keywordElement);
+            });
+
+            generateMarkdown();
+        }
+
+        function addTopic(topic) {
+            if (!userKeywords.includes(topic)) {
+                userKeywords.push(topic);
+                updateUserKeywords();
+            }
+        }
+
+        function addKeyword(keyword) {
+            if (!userKeywords.includes(keyword)) {
+                userKeywords.push(keyword);
+                updateUserKeywords();
+            }
+        }
+
+        function removeKeyword(keyword) {
+            userKeywords = userKeywords.filter(kw => kw !== keyword);
+            updateUserKeywords();
+        }
+
+        function sendRequestWithRetry(url, options, retryCount = 1) {
+            return fetch(url, options)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .catch(error => {
+                    if (retryCount > 0) {
+                        console.warn('Retrying request...');
+                        return sendRequestWithRetry(url, options, retryCount - 1);
+                    }
+                    throw error;
+                });
+        }
+
+        function generateMarkdown() {
+            if (!navigator.onLine) {
+                alert("You are offline. Please check your internet connection.");
+                return;
+            }
+
+            document.getElementById("spinner").style.display = "block"; // Show spinner
+
+            const keywordsQuery = encodeURIComponent(userKeywords.join(','));
+
+            sendRequestWithRetry('/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'keywords=' + keywordsQuery
+            })
+            .then(data => {
+                const md = window.markdownit();
+                const renderedMarkdown = md.render(data.markdown);
+                document.getElementById("content").innerHTML = renderedMarkdown;
+
+                return sendRequestWithRetry('/generate_topics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'keywords=' + keywordsQuery + '&markdown=' + encodeURIComponent(document.getElementById("content").innerText)
+                });
+            })
+            .then(data => {
+                updateAvailableTopics(data.topics);
+            })
+            .catch(error => {
+                console.error('Error generating content:', error);
+                alert("An error occurred while generating content. Please try again later.");
+            })
+            .finally(() => {
+                document.getElementById("spinner").style.display = "none"; // Hide spinner
+            });
+        }
+
+        function updateAvailableTopics(topics) {
+            const availableTopicsContainer = document.createDocumentFragment(); // Use a document fragment for batch updates
+            topics.forEach(topic => {
+                const topicElement = document.createElement('a');
+                topicElement.className = 'topic';
+                topicElement.textContent = topic;
+                topicElement.href = '#';
+                topicElement.onclick = (event) => {
+                    event.preventDefault();
+                    addTopic(topic);
+                };
+                availableTopicsContainer.appendChild(topicElement);
+            });
+            const container = document.getElementById("available-topics");
+            container.innerHTML = ''; // Clear the container once
+            container.appendChild(availableTopicsContainer); // Append the new content in one go
+        }
+    </script>
+</body>
+</html>

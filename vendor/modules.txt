@@ -46,6 +46,9 @@ cloud.google.com/go/vertexai/internal/support
 ## explicit; go 1.16
 github.com/allegro/bigcache/v3
 github.com/allegro/bigcache/v3/queue
+# github.com/dustin/go-humanize v1.0.1
+## explicit; go 1.16
+github.com/dustin/go-humanize
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
@@ -102,6 +105,9 @@ github.com/xyproto/env/v2
 # github.com/xyproto/multimodal v1.3.3
 ## explicit; go 1.22.3
 github.com/xyproto/multimodal
+# github.com/xyproto/ollamaclient/v2 v2.5.0
+## explicit; go 1.21.3
+github.com/xyproto/ollamaclient/v2
 # github.com/xyproto/simpleflash v1.0.1
 ## explicit; go 1.22.6
 github.com/xyproto/simpleflash

@@ -4,6 +4,7 @@ go 1.22.6
 
 require (
 	github.com/xyproto/env/v2 v2.3.0
+	github.com/xyproto/ollamaclient/v2 v2.5.0
 	github.com/xyproto/simpleflash v1.0.1
 )
 
@@ -17,6 +18,7 @@ require (
 	cloud.google.com/go/longrunning v0.5.12 // indirect
 	cloud.google.com/go/vertexai v0.12.0 // indirect
 	github.com/allegro/bigcache/v3 v3.1.1-0.20240514165432-a2f05d7cbfdc // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

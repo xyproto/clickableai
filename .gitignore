@@ -3,6 +3,7 @@
 *.swp
 *.tmp
 .DS_Store
-clickableai
 include.txt
 run.sh
+cmd/gemini/gemini
+cmd/ollama/ollama
