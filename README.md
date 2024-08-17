@@ -1,5 +1,7 @@
 # Clickable AI
 
+## NOTE: The main branch is currently very experimental, but the latest release tag should be good.
+
 This is an experiment in making LLMs browsable and clickable instead of promptable and searchable.
 
 * Starts a web server where keywords and generated technical documentation is presented.
